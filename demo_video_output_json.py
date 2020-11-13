@@ -1,3 +1,5 @@
+import json
+
 import cv2
 import matplotlib.pyplot as plt
 import copy
@@ -16,8 +18,9 @@ print(f"Torch device: {torch.cuda.get_device_name()}")
 
 
 def process_one(video_input):
-    output_fname = './output-vid/' + video_input.split('/')[-1].split('.')[
-        0] + '_openpose_inference_kp.avi'
+    seq = video_input.split('/')[-1].split('.')[
+        0]
+    output_fname = './output-vid/' + seq + '_openpose_inference_kp.avi'
     print(output_fname)
     if os.path.isfile(output_fname):
         print("file alreay exist, return and process next")
@@ -28,37 +31,40 @@ def process_one(video_input):
     frames_per_second = cap.get(cv2.CAP_PROP_FPS)
     # cap.set(3, 640)
     # cap.set(4, 480)
-    output_file = cv2.VideoWriter(
-        filename=output_fname,
-        # some installation of opencv may not support x264 (due to its license),
-        # you can try other format (e.g. MPEG)
-        # apiPreference=1,
-        fourcc=cv2.VideoWriter_fourcc(*'XVID'),
-        # fourcc=cv2.VideoWriter_fourcc(*"x264"),
-        fps=float(frames_per_second),
-        frameSize=(width, height),
-        isColor=True)
+    # output_file = cv2.VideoWriter(
+    #     filename=output_fname,
+    #     # some installation of opencv may not support x264 (due to its license),
+    #     # you can try other format (e.g. MPEG)
+    #     # apiPreference=1,
+    #     fourcc=cv2.VideoWriter_fourcc(*'XVID'),
+    #     # fourcc=cv2.VideoWriter_fourcc(*"x264"),
+    #     fps=float(frames_per_second),
+    #     frameSize=(width, height),
+    #     isColor=True)
     people = {}
+    people['pose_keypoints_2d'] = {}
     cnt = 0
     while True:
-        cnt += 1
         ret, oriImg = cap.read()
+        cnt += 1
+        print("frame", cnt)
         if oriImg is None:
             break
+        # if cnt % 10 != 0: continue
         candidate, subset = body_estimation(oriImg)
         # save the 2d-pose results to JSON as the OpenPose output format
-        people['pose_keypoints_2d'] = {}
-        people['pose_keypoints_2d'][ret] = []
+        people['pose_keypoints_2d'][cnt] = []
 
         for i in range(18):
             for n in range(len(subset)):
                 index = int(subset[n][i])
                 xyc = [-1, -1, -1] if index == -1 else candidate[index][0:3]
                 people['pose_keypoints_2d'][cnt].extend(xyc)
+        print(people['pose_keypoints_2d'][cnt])
         #
         # canvas = copy.deepcopy(oriImg)
         # canvas = util.draw_bodypose(canvas, candidate, subset)
-        canvas = util.draw_bodypose(oriImg, candidate, subset)
+        # canvas = util.draw_bodypose(oriImg, candidate, subset)
         # detect hand
         # hands_list = util.handDetect(candidate, subset, oriImg)
         #
@@ -71,14 +77,15 @@ def process_one(video_input):
         #
         # canvas = util.draw_handpose(canvas, all_hand_peaks)
         #
-        cv2.imshow('demo', canvas)  # 一个窗口用以显示原视频
-        output_file.write(canvas)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        # cv2.imshow('demo', canvas)  # 一个窗口用以显示原视频
+        # output_file.write(canvas)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
     cap.release()
-    output_file.release()
+    # output_file.release()
     cv2.destroyAllWindows()
-    json_out = {people}
+    with open("./output-vid/" + seq + ".json", "w") as dump_f:
+        json.dump(people, dump_f)
 
 
 if __name__ == "__main__":
@@ -88,4 +95,4 @@ if __name__ == "__main__":
             video_input = root + file
             print(video_input)
             process_one(video_input)
-            exit(213)
+            # exit(213)
